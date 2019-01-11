@@ -51,7 +51,7 @@ interface AppFolder {
 interface AppState {
   dropbox: Dropbox;
   encryptKey: CryptoKey | null;
-  
+
   folder: AppFolder;
 
   viewFile: PpFile | null;   // the file we are viewing
@@ -74,7 +74,7 @@ function FileView(props: {file: PpFile, fileUrl: string}): JSX.Element {
     return (
       <video style={style} controls>
         <source src={props.fileUrl} type="video/mp4"/>
-      </video>    
+      </video>
     )
   } else {
     return (<div>{filename}</div>)
@@ -86,9 +86,9 @@ function FileItem(props: {file: PpFile, handler: PpFileCallback}): JSX.Element {
   if (f.decrypted) {
     return (
       <ListItem key={props.file.originName} button={true} onClick={(e) => props.handler(e,f)}>
-        { f.isFolder ? 
-          <ListItemIcon><FolderIcon color="secondary"/></ListItemIcon> : 
-          <ListItemIcon><LockOpenIcon color="secondary"/></ListItemIcon> }      
+        { f.isFolder ?
+          <ListItemIcon><FolderIcon color="secondary"/></ListItemIcon> :
+          <ListItemIcon><LockOpenIcon color="secondary"/></ListItemIcon> }
         <ListItemText primary={f.displayName} secondary={f.originName}/>
       </ListItem>
     )
@@ -139,7 +139,7 @@ function FileList(props: { files: PpFile[], handler: PpFileCallback }): JSX.Elem
 }
 
 async function setPassword(e: React.FormEvent<HTMLElement>, app: AppState) {
-  e.preventDefault()    
+  e.preventDefault()
   const newKey = await EncLib.passwordToKey(e.target['encryptPassword'].value)
   goFolder({...app, encryptKey: newKey}, app.folder.originPath)
 }
@@ -152,7 +152,7 @@ function PasswordField(props: {app: AppState}): JSX.Element {
 
   if (!props.app.encryptKey) {
     const inputStyle = {
-      backgroundColor: '#93D3F1'      
+      backgroundColor: '#93D3F1'
     }
 
     return (
@@ -201,11 +201,11 @@ async function createFolder(folder: string, app: AppState) {
   if (folder == "") return
   if (!app.encryptKey) {
     showApp({...app, progress: "Creating folder..."})
-    await app.dropbox.filesCreateFolderV2({path: app.folder.originPath + folder})    
+    await app.dropbox.filesCreateFolderV2({path: app.folder.originPath + folder})
   } else {
     const iv = EncLib.genIv()
     const dec = await EncLib.encryptFilename(app.encryptKey, iv, folder)
-    await app.dropbox.filesCreateFolderV2({path: app.folder.originPath + dec})    
+    await app.dropbox.filesCreateFolderV2({path: app.folder.originPath + dec})
   }
   goFolder(app, app.folder.originPath)
 }
@@ -232,19 +232,19 @@ function App(props: { app: AppState }) {
     <div onDragOver={(e) => e.preventDefault()} onDrop={ (e) => app.progress ? null : handleDrop(e, app) }>
       <AppBar position="static">
         <Toolbar>
-          { backClick ? <IconButton><ArrowBackIcon onClick={e => backClick ? backClick() : null }/></IconButton> : null }          
+          { backClick ? <IconButton><ArrowBackIcon onClick={e => backClick ? backClick() : null }/></IconButton> : null }
           <Typography variant="h6" color="inherit">
             {app.folder ? app.folder.originPath : ""}
           </Typography>
           <IconButton onClick={(e) => setShowNewFolder(true)}><CreateNewFolderIcon/></IconButton>
-          <div style={ {flexGrow:1} }/>          
+          <div style={ {flexGrow:1} }/>
           <PasswordField app={app}/>
         </Toolbar>
       </AppBar>
       { mainView }
-      { showNewFolder ? 
-        <NewFolderDialog onClose={() => setShowNewFolder(false)} onSubmit={(s) => {setShowNewFolder(false); createFolder(s, app)}}/> 
-        : null }      
+      { showNewFolder ?
+        <NewFolderDialog onClose={() => setShowNewFolder(false)} onSubmit={(s) => {setShowNewFolder(false); createFolder(s, app)}}/>
+        : null }
       { app.progress ? <MessageDialog message={app.progress}/> : null }
     </div>
   )
@@ -275,16 +275,16 @@ async function fetchFolder(dbx: Dropbox, path: string, key: CryptoKey | null): P
     while (ret.has_more) {
       ret = await dbx.filesListFolderContinue({cursor: ret.cursor})
       allFiles = allFiles.concat(await Promise.all(ret.entries.map((o,i) => decryptDropboxFilename(o.name, o['.tag'] == 'folder', key))))
-    }  
-    return { originPath: path, files: allFiles }  
+    }
+    return { originPath: path, files: allFiles }
   } else {
     var ret = await dbx.filesListFolder({path: path == '/' ? '' : path})
     var allFiles = ret.entries.map((o,i) => ({ displayName: o.name, originName: o.name, decrypted: null, isFolder: o['.tag'] == 'folder' })) as PpFile[]
     while (ret.has_more) {
       ret = await dbx.filesListFolderContinue({cursor: ret.cursor})
       allFiles = allFiles.concat(ret.entries.map((o,i) => ({ displayName: o.name, originName: o.name, decrypted: null, isFolder: o['.tag'] == 'folder' })))
-    }  
-    return { originPath: path, files: allFiles }  
+    }
+    return { originPath: path, files: allFiles }
   }
 }
 
@@ -307,7 +307,7 @@ async function goFile(app: AppState, file: PpFile): Promise<void> {
     blob = new Blob([decrypted], { type: "image/png" })
   }
   let url = window.URL.createObjectURL(blob)
-  showApp({...app, viewFile: file, viewFileUrl: url })  
+  showApp({...app, viewFile: file, viewFileUrl: url })
 }
 
 async function goUpFolder(app: AppState): Promise<void> {
@@ -335,30 +335,45 @@ async function uploadFile(entry: PpFileEntry, app: AppState): Promise<AppState> 
   if (!app.encryptKey) return app
 
   // are we replacing an existing file?
-  showApp({...app, progress: "Uploading " + entry.name})  
+  showApp({...app, progress: "Uploading " + entry.name})
 
   console.log(entry)
   let fileBuf = await EncLib.readBlob(entry.file)
 
   var newFiles = app.folder.files;
   var replace = app.folder.files.find(o => !o.isFolder && o.decrypted != null && o.decrypted.name == entry.name)
-
+  var isNewFile = true
   if (!replace) {
     let iv = EncLib.genIv()
     let filename = await EncLib.encryptFilename(app.encryptKey, iv, entry.name)
-    console.log("UPLOADING " + filename)
     replace = {
       displayName: entry.name,
       isFolder: false,
       decrypted: { iv: iv, name: entry.name },
       originName: filename
     }
+    isNewFile = false
     newFiles = newFiles.concat(replace)
   }
   if (!replace.decrypted) return app  // fix ts warning
 
-  let content = await EncLib.encrypt(app.encryptKey, replace.decrypted.iv, fileBuf)
-  await app.dropbox.filesUpload({path: app.folder.originPath + replace.originName, contents: content})
+  const destPath = app.folder.originPath + replace.originName
+
+  console.log("UPLOADING " + destPath)
+  const content = await EncLib.encrypt(app.encryptKey, replace.decrypted.iv, fileBuf)
+
+  if (content.byteLength >= 100000000) {
+    // more than 100mb, need different path
+    const sessionId = (await app.dropbox.filesUploadSessionStart({ contents: null, close: false })).session_id
+    const offset= 5
+    await app.dropbox.filesUploadSessionAppendV2({ contents: null, cursor: { session_id: sessionId, offset: offset}, close: false})
+    let commit = { path: "destPath", autorename: false, mute: false, mode: isNewFile ? "add" : "overwrite" }
+    await app.dropbox.filesUploadSessionFinish({ cursor: { session_id: sessionId, offset: offset}, commit: commit})
+    
+  } else {
+    await app.dropbox.filesUpload({path: destPath, contents: content})
+  }
+
   return {...app, folder: { ...app.folder, files: newFiles} }
 }
 
@@ -408,9 +423,9 @@ async function handleDrop(event: React.DragEvent<HTMLElement>, app: AppState) {
   //       for(var f of files) {
   //         console.log(f.name)
   //       }
-        
+
   //     } else if (entry.isFile) {
-  //       const file = entry.file()  
+  //       const file = entry.file()
   //       //await $dbx.filesUpload({path: `/${entry.name}`, contents: await encrypt(await readFileAsync(file))})
   //       //loadFolder('')
   //       let iv = genIv()
@@ -429,8 +444,8 @@ function handleDrag(event) {
 
 // async function loadImage(e, origin: string, dec: EncLib.IDecryptedFilename) {
 //   e.preventDefault()
-//   showScreen(<div>Loading {dec.name}</div>)  
-//   let resp = await $dbx.filesDownload({ path: origin })  
+//   showScreen(<div>Loading {dec.name}</div>)
+//   let resp = await $dbx.filesDownload({ path: origin })
 //   console.log(resp)
 
 //   let blob: Blob = resp.fileBlob
@@ -452,10 +467,10 @@ async function startup() {
   if (dbxToken) {
     const dbx = new Dropbox({ accessToken: dbxToken });
     //const enckey = await EncLib.passwordToKey("abcd1234")
-    const app: AppState = { 
-      dropbox: dbx, 
-      encryptKey: null, 
-      folder: { originPath: "/", files: [] }, 
+    const app: AppState = {
+      dropbox: dbx,
+      encryptKey: null,
+      folder: { originPath: "/", files: [] },
       progress: null,
       viewFile: null,
       viewFileUrl: null }

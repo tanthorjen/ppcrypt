@@ -1,3 +1,5 @@
+import { ab2str } from 'arraybuffer-to-string'
+import { str2ab } from 'string-to-arraybuffer'
 /// All the encrypt/decrypt functions are here
 
 
@@ -26,8 +28,8 @@ export function readBlob(file: Blob): Promise<ArrayBuffer> {
   })
 }
 
-export function genIv(): Uint8Array { 
-  return  window.crypto.getRandomValues(new Uint8Array(12)) 
+export function genIv(): Uint8Array {
+  return  window.crypto.getRandomValues(new Uint8Array(12))
 }
 
 export async function encryptFilename(key: CryptoKey, iv: Uint8Array, filename: string): Promise<string> {
@@ -63,7 +65,7 @@ export async function passwordToKey(password: string): Promise<CryptoKey> {
   return await window.crypto.subtle.deriveKey(
     {
       "name": "PBKDF2",
-      "iterations": 100000,      
+      "iterations": 100000,
       "hash": "SHA-256",
       salt: b64toab("iEqDINbB6UIZ1oI0p0TrbQ==")
     },
@@ -105,16 +107,11 @@ function unsafe_b64(s:string): string {
 }
 
 function abtostr(buf: ArrayBuffer): string {
-  return String.fromCharCode.apply(null, new Uint16Array(buf));
+  return ab2str(buf, 'utf8')
 }
 
 function strtoab(str: string): ArrayBuffer {
-  const buf = new ArrayBuffer(str.length*2); // 2 bytes for each char
-  const bufView = new Uint16Array(buf);
-  for (let i=0, strLen=str.length; i < strLen; i++) {
-    bufView[i] = str.charCodeAt(i);
-  }
-  return buf;
+  return str2ab(str, 'utf8')
 }
 
 function u8tob64(u8: Uint8Array): string {
@@ -123,7 +120,7 @@ function u8tob64(u8: Uint8Array): string {
 
 function b64tou8(base64: string): Uint8Array {
     const binstring =  window.atob(base64);
-    const len = binstring.length; 
+    const len = binstring.length;
     const bytes = new Uint8Array( len );
     for (let i = 0; i < len; i++)        {
         bytes[i] = binstring.charCodeAt(i);
